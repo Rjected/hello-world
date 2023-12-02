@@ -17,31 +17,6 @@
 ; esp: stack pointer
 ; ebp: base pointer
 
-section .text
-    ; global: make label visible to linker
-    ; _main: label
-    global _main
-
-; _main: entrypoint
-_main:
-    ; goal is to basically call:
-    ; sys_write(fd, msg, len)
-    ; sys_exit()
-    ; where fd is stdout, msg is hello world, len is len(msg)
-    ; https://x64.syscall.sh/
-    mov rax, 1 ; sys_write syscall number for `syscall`
-    mov rdi, 1 ; stdout file descriptor
-    mov rsi, qword msg ; msg addr (explicitly 64 bit, macos etc doesn't like 32 bit)
-    mov rdx, len ; len of msg
-    ; interrupt with 0x80, which is the kernel handler, use syscall
-    ; to work with 64 bit registers
-    syscall
-
-    ; now we need to exit
-    mov rax, 1 ; sys_exit syscall number
-    mov rbx, 0 ; exit code
-    int 0x80 ; interrupt with 0x80, which is the kernel handler
-
 section .data
     ; msg: label
     ; db: Define Byte
@@ -56,6 +31,31 @@ section .data
     ; $-msg: subtracting the address of msg from the current position
     len equ $-msg
 
+section .text
+    ; global: make label visible to linker
+    ; _main: label
+    global _main
+
+; _main: entrypoint
+_main:
+    ; goal is to basically call:
+    ; sys_write(fd, msg, len)
+    ; sys_exit()
+    ; where fd is stdout, msg is hello world, len is len(msg)
+    ; mov rax, 4 ; sys_write syscall number for `syscall` <- doesn't work on macos
+    mov rax, 0x2000004 ; sys_write syscall number for `syscall` (macos)
+    mov rdi, 1 ; stdout file descriptor
+    lea rsi, [rel msg] ; msg addr, use rip (important)
+    mov rdx, len ; len of msg
+    ; interrupt with 0x80, which is the kernel handler, use syscall
+    ; to work with 64 bit registers
+    syscall
+
+    ; now we need to exit
+    ; mov rax, 0x3c ; sys_exit syscall number <- doesn't work on macos
+    mov rax, 0x2000001 ; sys_exit syscall number (macos)
+    mov rdi, 0 ; exit code
+    syscall ; use syscall to exit
 
 ; on linux:
 ; yasm -f elf64 -o hello-world.o hello-world.asm
